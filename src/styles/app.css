@@ -1,0 +1,284 @@
+/*
+ * "Projection room" app shell on top of Radix Themes (slate + amber).
+ * Uses Radix tokens only, so light and dark follow <Theme appearance>.
+ */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.radix-themes {
+  background: var(--gray-1);
+  min-height: 100%;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: var(--color-panel-solid);
+  border-right: 1px solid var(--gray-a5);
+  z-index: 20;
+}
+
+.sidebar-inner {
+  height: 100%;
+}
+
+.brand {
+  padding: 18px 18px 14px;
+}
+
+.brand-mark {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--accent-9);
+  color: var(--accent-contrast);
+}
+
+/* film-strip perforations top and bottom of the logo */
+.brand-mark::before,
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: repeating-linear-gradient(90deg, transparent 0 3px, rgb(0 0 0 / 0.35) 3px 6px);
+}
+.brand-mark::before {
+  top: 2px;
+}
+.brand-mark::after {
+  bottom: 2px;
+}
+
+.filmstrip {
+  height: 6px;
+  margin: 0 18px 10px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, var(--gray-a4) 0 10px, transparent 10px 14px);
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 10px;
+}
+
+.nav-label {
+  padding: 14px 10px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--radius-2);
+  color: var(--gray-11);
+  text-decoration: none;
+  font-size: var(--font-size-2);
+}
+.nav-link:hover {
+  background: var(--gray-a3);
+  color: var(--gray-12);
+}
+.nav-link:focus-visible {
+  outline: 2px solid var(--focus-8);
+  outline-offset: -2px;
+}
+.nav-link.active {
+  background: var(--accent-a3);
+  color: var(--accent-11);
+  font-weight: 600;
+}
+.nav-chip {
+  margin-left: auto;
+}
+
+.sidebar-foot {
+  padding: 12px 14px;
+  border-top: 1px solid var(--gray-a5);
+}
+
+/* ---------- main column ---------- */
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  background: color-mix(in srgb, var(--gray-1) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--gray-a4);
+}
+
+.menu-btn {
+  display: none !important;
+}
+
+.cmdk {
+  flex: 1;
+  max-width: 520px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: var(--radius-3);
+  border: 1px solid var(--gray-a6);
+  background: var(--color-surface);
+  color: var(--gray-10);
+  font: inherit;
+  font-size: var(--font-size-2);
+  cursor: text;
+  text-align: left;
+}
+.cmdk:hover {
+  border-color: var(--gray-a8);
+}
+.cmdk-kbd {
+  margin-left: auto;
+}
+
+.content {
+  width: 100%;
+  max-width: 1240px;
+  padding: 28px;
+  box-sizing: border-box;
+}
+
+.page-head {
+  margin-bottom: 20px;
+}
+
+/* ---------- home ---------- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-5);
+  border: 1px solid var(--gray-a5);
+  background:
+    radial-gradient(600px 220px at 85% -20%, var(--accent-a5), transparent 70%),
+    linear-gradient(135deg, var(--gray-3), var(--color-panel-solid));
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  bottom: 18px;
+  width: 380px;
+  height: 22px;
+  transform: rotate(-8deg);
+  opacity: 0.5;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, var(--gray-a7) 0 16px, transparent 16px 22px);
+}
+.hero-text {
+  max-width: 520px;
+  margin: 6px 0 18px;
+}
+
+.tile {
+  text-decoration: none;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+.tile:hover {
+  transform: translateY(-2px);
+}
+.tile-icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-a3);
+  color: var(--accent-11);
+}
+
+.fullpage {
+  min-height: 100vh;
+}
+
+/* ---------- phones ---------- */
+.scrim {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    position: fixed;
+    left: 0;
+    width: 264px;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease-out;
+  }
+  .sidebar.open {
+    transform: none;
+    box-shadow: var(--shadow-6);
+  }
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    background: var(--color-overlay);
+  }
+  .menu-btn {
+    display: inline-flex !important;
+  }
+  .topbar {
+    padding: 10px 16px;
+  }
+  .content {
+    padding: 18px 16px;
+  }
+  .hero {
+    padding: 20px;
+  }
+  .cmdk-kbd,
+  .hero::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .sidebar {
+    transition: none;
+  }
+}
