@@ -626,3 +626,115 @@ a.row-name:focus-visible {
     animation-duration: 3s;
   }
 }
+
+/* ---------- manage mode ---------- */
+.manage .row {
+  grid-template-columns: 22px 26px minmax(0, 1fr) 80px 120px auto;
+}
+.manage .row.row-nometa {
+  grid-template-columns: 22px 26px minmax(0, 1fr) auto;
+}
+.row-selected,
+.row-selected:hover {
+  background: var(--accent-a3);
+}
+.manage-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  margin-top: 14px;
+  padding: 10px 16px;
+  border-radius: var(--radius-4);
+  background: var(--color-panel-solid);
+  border: 1px solid var(--gray-a6);
+  box-shadow: var(--shadow-5);
+}
+.manage-spacer {
+  flex: 1;
+}
+.manage-count {
+  min-width: 110px;
+}
+
+/* folder picker */
+.picker-path {
+  font-size: var(--font-size-2);
+  color: var(--gray-11);
+}
+.picker-crumb {
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 2px 4px;
+  border-radius: var(--radius-1);
+  cursor: pointer;
+}
+.picker-crumb:last-of-type {
+  color: var(--gray-12);
+  font-weight: 600;
+}
+.picker-crumb:hover {
+  background: var(--gray-a3);
+}
+.picker-list {
+  max-height: 200px;
+  border: 1px solid var(--gray-a5);
+  border-radius: var(--radius-3);
+  padding: 4px;
+}
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-2);
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-2);
+  color: var(--gray-12);
+  text-align: left;
+  cursor: pointer;
+}
+.picker-item:hover,
+.picker-item:focus-visible {
+  background: var(--accent-a3);
+  outline: none;
+}
+.result-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.link-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.job-list {
+  max-height: 220px;
+  overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .manage .row,
+  .manage .row.row-nometa {
+    grid-template-columns: 22px 26px minmax(0, 1fr);
+  }
+  .manage .row .row-actions {
+    grid-column: 3;
+  }
+  .manage-bar {
+    bottom: 8px;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .manage-spacer {
+    display: none;
+  }
+}

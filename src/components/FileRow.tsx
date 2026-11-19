@@ -1,4 +1,4 @@
-import { IconButton, Text, Tooltip } from '@radix-ui/themes'
+import { Checkbox, IconButton, Text, Tooltip } from '@radix-ui/themes'
 import { Cast, Download, Info, Play } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { Link } from 'react-router'
@@ -24,6 +24,10 @@ interface Props {
   showMeta?: boolean
   onPlay: (path: string) => void
   onInfo: (path: string) => void
+  /** Manage mode: show a checkbox */
+  selectable?: boolean
+  selected?: boolean
+  onSelect?: (selected: boolean) => void
 }
 
 const playable = (type: ItemType) => type === 'video' || type === 'audio'
@@ -32,7 +36,7 @@ const playable = (type: ItemType) => type === 'video' || type === 'audio'
  * One library entry with its actions (port of the old list-group rows):
  * name opens the folder or the file itself, then Info / Cast / Download / Play.
  */
-export function FileRow({ item, label, showMeta = true, onPlay, onInfo }: Props) {
+export function FileRow({ item, label, showMeta = true, onPlay, onInfo, selectable, selected, onSelect }: Props) {
   const text = label ?? item.name
 
   // Clicking a file name logs "file link", then lets the browser open it
@@ -45,7 +49,13 @@ export function FileRow({ item, label, showMeta = true, onPlay, onInfo }: Props)
   }
 
   return (
-    <li className={showMeta ? 'row' : 'row row-nometa'} data-letter={item.letter}>
+    <li
+      className={['row', showMeta ? '' : 'row-nometa', selectable ? 'row-selectable' : '', selected ? 'row-selected' : ''].filter(Boolean).join(' ')}
+      data-letter={item.letter}
+    >
+      {selectable && (
+        <Checkbox checked={!!selected} onCheckedChange={(c) => onSelect?.(c === true)} aria-label={`Select ${item.name}`} />
+      )}
       <FileTypeIcon type={item.type} />
 
       {item.type === 'folder' ? (

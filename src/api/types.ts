@@ -32,6 +32,8 @@ export interface LibraryItem {
   mtime: number
   /** a–z, 0–9 or "#" (for the A–Z rail and type-to-jump) */
   letter: string
+  /** admins only: tidied-up name for files (e.g. "S02E05 - Undertow.mp4") */
+  suggestedName?: string
 }
 
 export interface Crumb {
