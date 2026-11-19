@@ -678,7 +678,8 @@ a.row-name:focus-visible {
   background: var(--gray-a3);
 }
 .picker-list {
-  max-height: 200px;
+  /* fixed height: the list doesn't jump about (or slip out from under the pointer) between folders */
+  height: 260px;
   border: 1px solid var(--gray-a5);
   border-radius: var(--radius-3);
   padding: 4px;
@@ -700,8 +701,12 @@ a.row-name:focus-visible {
 }
 .picker-item:hover,
 .picker-item:focus-visible {
-  background: var(--accent-a3);
+  background: var(--gray-a3);
   outline: none;
+}
+.picker-item.is-active {
+  background: var(--accent-a4);
+  box-shadow: inset 2px 0 0 var(--accent-9);
 }
 .result-list {
   margin: 6px 0 0;
