@@ -872,3 +872,26 @@ a.row-name:focus-visible {
 .page-head a:hover {
   text-decoration-color: currentColor;
 }
+.picked {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--gray-a5);
+}
+.picked-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.picked-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+.picked-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

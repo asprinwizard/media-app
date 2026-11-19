@@ -1,8 +1,8 @@
-import { Badge, Button, Callout, Card, Checkbox, Flex, Heading, Progress, Spinner, Text, TextField } from '@radix-ui/themes'
-import { CircleCheck, Search as SearchIcon } from 'lucide-react'
+import { Badge, Button, Callout, Card, Checkbox, Flex, Heading, IconButton, Progress, Spinner, Text, TextField } from '@radix-ui/themes'
+import { CircleCheck, Search as SearchIcon, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { useIplayerDownload, useIplayerSearch, useIplayerStatus, type IplayerTrack } from '../api/acquire'
+import { useIplayerDownload, useIplayerSearch, useIplayerStatus, type IplayerResult, type IplayerTrack } from '../api/acquire'
 import { useMe } from '../api/useMe'
 import { PageHeader } from '../components/PageHeader'
 import { formatBytes } from '../lib/format'
@@ -68,6 +68,30 @@ function Track({ title, track }: { title: string; track: IplayerTrack }) {
   )
 }
 
+interface Picked {
+  pid: string
+  name: string
+  channel: string | null
+}
+
+const PICKED_KEY = 'iplayer-picked'
+
+function loadPicked(): Map<string, Picked> {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(PICKED_KEY) ?? '[]') as Picked[]
+    return new Map(saved.filter((p) => p && typeof p.pid === 'string').map((p) => [p.pid, p]))
+  } catch {
+    return new Map()
+  }
+}
+
+/** "Name - Episode, Channel, pid" → name and channel. */
+function describe(r: IplayerResult): Picked {
+  const parts = r.label.split(', ')
+  const channel = parts.length >= 3 ? (parts.at(-2) ?? null) : null
+  return { pid: r.pid, name: parts.slice(0, channel ? -2 : -1).join(', '), channel }
+}
+
 /**
  * BBC iPlayer (admin): search and tick programmes, or download by PID/link,
  * then watch the download folder (port of the old iPlayer page).
@@ -77,7 +101,18 @@ export function Iplayer() {
   const [draft, setDraft] = useState('')
   const [q, setQ] = useState('')
   const search = useIplayerSearch(q)
-  const [picked, setPicked] = useState<Set<string>>(new Set())
+  // Picks persist across searches (and page visits this session), like the
+  // old page's "Selected Files" list: search "news", tick one, search
+  // "weather", tick one, download both.
+  const [picked, setPicked] = useState<Map<string, Picked>>(loadPicked)
+  const savePicked = (next: Map<string, Picked>) => {
+    setPicked(next)
+    try {
+      sessionStorage.setItem(PICKED_KEY, JSON.stringify([...next.values()]))
+    } catch {
+      // storage unavailable: the list just won't survive leaving the page
+    }
+  }
   const [searchOptions, setSearchOptions] = useState({ sdCopy: false, force: false, recursive: false })
 
   const [pid, setPid] = useState('')
@@ -89,7 +124,6 @@ export function Iplayer() {
 
   const submitSearch = (event: FormEvent) => {
     event.preventDefault()
-    setPicked(new Set())
     setQ(draft.trim())
   }
 
@@ -104,12 +138,21 @@ export function Iplayer() {
     }
   }
 
-  const results = search.data?.results ?? []
-  const toggle = (p: string, on: boolean) => {
-    const next = new Set(picked)
-    if (on) next.add(p)
-    else next.delete(p)
-    setPicked(next)
+  const results = (search.data?.results ?? []).map(describe)
+  const toggle = (item: Picked, on: boolean) => {
+    const next = new Map(picked)
+    if (on) next.set(item.pid, item)
+    else next.delete(item.pid)
+    savePicked(next)
+  }
+  const allHerePicked = results.length > 0 && results.every((r) => picked.has(r.pid))
+  const pickAllHere = (on: boolean) => {
+    const next = new Map(picked)
+    for (const r of results) {
+      if (on) next.set(r.pid, r)
+      else next.delete(r.pid)
+    }
+    savePicked(next)
   }
   const queueInfo = status.data?.queue
   const waiting = queueInfo?.pending.length ?? 0
@@ -187,49 +230,67 @@ export function Iplayer() {
             <>
               <Flex justify="between" align="center" mt="3" mb="1">
                 <Text size="1" color="gray">
-                  {results.length} result{results.length === 1 ? '' : 's'}
+                  {results.length} result{results.length === 1 ? '' : 's'} for “{q}”
                 </Text>
-                <Button
-                  size="1"
-                  variant="ghost"
-                  color="gray"
-                  onClick={() => setPicked(picked.size === results.length ? new Set() : new Set(results.map((r) => r.pid)))}
-                >
-                  {picked.size === results.length ? 'Select none' : 'Select all'}
+                <Button size="1" variant="ghost" color="gray" onClick={() => pickAllHere(!allHerePicked)}>
+                  {allHerePicked ? 'Untick these' : 'Tick all these'}
                 </Button>
               </Flex>
               <div className="pick-list">
-                {results.map((r) => {
-                  const parts = r.label.split(', ')
-                  const channel = parts.length >= 3 ? parts.at(-2) : null
-                  const name = parts.slice(0, channel ? -2 : -1).join(', ')
-                  return (
-                    <Text as="label" key={r.pid} className="pick-item">
-                      <Checkbox checked={picked.has(r.pid)} onCheckedChange={(c) => toggle(r.pid, c === true)} />
-                      <span>
-                        <Text size="2" as="span" weight="medium">
-                          {name}
-                        </Text>
-                        <Text size="1" as="div" color="gray">
-                          {[channel, r.pid].filter(Boolean).join(' · ')}
-                        </Text>
-                      </span>
-                    </Text>
-                  )
-                })}
+                {results.map((r) => (
+                  <Text as="label" key={r.pid} className="pick-item">
+                    <Checkbox checked={picked.has(r.pid)} onCheckedChange={(c) => toggle(r, c === true)} />
+                    <span>
+                      <Text size="2" as="span" weight="medium">
+                        {r.name}
+                      </Text>
+                      <Text size="1" as="div" color="gray">
+                        {[r.channel, r.pid].filter(Boolean).join(' · ')}
+                      </Text>
+                    </span>
+                  </Text>
+                ))}
               </div>
+            </>
+          )}
+
+          {picked.size > 0 && (
+            <div className="picked">
+              <Flex justify="between" align="center" mb="2">
+                <Text size="2" weight="bold">
+                  Selected ({picked.size})
+                </Text>
+                <Button size="1" variant="ghost" color="gray" onClick={() => savePicked(new Map())}>
+                  Clear
+                </Button>
+              </Flex>
+              <ul className="picked-list">
+                {[...picked.values()].map((p) => (
+                  <li key={p.pid}>
+                    <Text size="2" className="picked-name">
+                      {p.name}
+                      <Text color="gray" size="1">
+                        {' '}
+                        · {p.pid}
+                      </Text>
+                    </Text>
+                    <IconButton size="1" variant="ghost" color="gray" aria-label={`Remove ${p.name}`} onClick={() => toggle(p, false)}>
+                      <X size={14} />
+                    </IconButton>
+                  </li>
+                ))}
+              </ul>
               <Flex align="center" gap="3" mt="3" wrap="wrap">
                 <Options value={searchOptions} onChange={setSearchOptions} />
                 <Button
                   ml="auto"
-                  disabled={picked.size === 0}
                   loading={download.isPending}
-                  onClick={() => queue([...picked], searchOptions, () => setPicked(new Set()))}
+                  onClick={() => queue([...picked.keys()], searchOptions, () => savePicked(new Map()))}
                 >
-                  Download {picked.size || ''}
+                  Download {picked.size}
                 </Button>
               </Flex>
-            </>
+            </div>
           )}
         </Card>
 
