@@ -2,9 +2,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// In production Apache serves this SPA at / and media-api under "Alias /api".
-// In development the API runs on `php artisan serve` (port 8000) with no /api
-// prefix, so the proxy strips it.
+// In production Apache serves this SPA at /, media-api under "Alias /api",
+// and the media files themselves at /media and /shared.
+// In development: the API on `php artisan serve` (port 8000, no /api prefix,
+// so the proxy strips it) and media-api's dev/static-server.php on port 8001
+// standing in for Apache's /media and /shared.
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -14,6 +16,8 @@ export default defineConfig({
         changeOrigin: false,
         rewrite: (path) => path.replace(/^\/api/, '') || '/',
       },
+      '/media': 'http://localhost:8001',
+      '/shared': 'http://localhost:8001',
     },
   },
   test: {
