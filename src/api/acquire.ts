@@ -5,7 +5,7 @@ import type { ItemType } from './types'
 // --- Upload ---
 
 export interface UploadFolder {
-  maxBytes: number | null
+  chunkBytes: number
   items: { name: string; type: ItemType; size: number | null; mtime: number }[]
 }
 
@@ -16,47 +16,107 @@ export function useUploadFolder() {
   })
 }
 
-/**
- * POST one file with progress. fetch() can't report upload progress, so this
- * uses XMLHttpRequest. X-Requested-With satisfies media-api's CSRF check.
- */
-export function uploadFile(
-  file: File,
-  onProgress: (loaded: number, total: number) => void,
-  signal: AbortSignal,
-): Promise<{ name: string }> {
-  return new Promise((resolve, reject) => {
+/** Waits before each retry of a failed chunk (ms). */
+const RETRY_DELAYS = [1000, 2000, 5000, 10_000, 20_000]
+
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(resolve, ms)
+    signal.addEventListener('abort', () => {
+      window.clearTimeout(timer)
+      reject(new ApiError(0, 'Upload cancelled.'))
+    })
+  })
+
+interface ChunkReply {
+  received?: number
+  expected?: number
+  message?: string
+}
+
+/** POST one chunk with progress. fetch() can't report upload progress, so XHR. */
+function sendChunk(id: string, index: number, blob: Blob, onProgress: (loaded: number) => void, signal: AbortSignal) {
+  return new Promise<{ status: number; body: ChunkReply }>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/uploads')
+    xhr.open('POST', `/api/uploads/${id}/chunks?index=${index}`)
     xhr.setRequestHeader('Accept', 'application/json')
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(e.loaded, e.total)
-    }
+    xhr.upload.onprogress = (e) => onProgress(e.loaded)
     xhr.onload = () => {
-      let body: { name?: string; message?: string } = {}
+      let body: ChunkReply = {}
       try {
         body = JSON.parse(xhr.responseText)
       } catch {
         // not JSON (e.g. a proxy error page)
       }
-      if (xhr.status >= 200 && xhr.status < 300) resolve({ name: body.name ?? file.name })
-      else
-        reject(
-          new ApiError(
-            xhr.status,
-            body.message ?? (xhr.status === 413 ? 'That file is bigger than the server allows.' : `Upload failed (${xhr.status})`),
-          ),
-        )
+      resolve({ status: xhr.status, body })
     }
-    xhr.onerror = () => reject(new ApiError(0, 'The connection dropped during the upload.'))
+    xhr.onerror = () => resolve({ status: 0, body: {} })
     xhr.onabort = () => reject(new ApiError(0, 'Upload cancelled.'))
-    signal.addEventListener('abort', () => xhr.abort())
+    const abort = () => xhr.abort()
+    signal.addEventListener('abort', abort)
+    xhr.onloadend = () => signal.removeEventListener('abort', abort)
 
     const form = new FormData()
-    form.append('file', file)
+    form.append('chunk', blob)
     xhr.send(form)
   })
+}
+
+/**
+ * Upload a file in chunks (media-api's ChunkedUploads). Each chunk is a short
+ * request, retried automatically if it fails, so a long upload survives a
+ * dropped connection, and there's no size limit from PHP.
+ */
+export async function uploadFile(
+  file: File,
+  chunkBytes: number,
+  onProgress: (sent: number) => void,
+  onRetry: (message: string | null) => void,
+  signal: AbortSignal,
+): Promise<{ name: string }> {
+  const { id } = await apiSend<{ id: string; name: string }>('POST', '/uploads', { name: file.name, size: file.size })
+  const total = Math.max(1, Math.ceil(file.size / chunkBytes))
+
+  try {
+    let index = 0
+    let failures = 0
+    while (index < total) {
+      const start = index * chunkBytes
+      const blob = file.slice(start, Math.min(file.size, start + chunkBytes))
+      const { status, body } = await sendChunk(id, index, blob, (loaded) => onProgress(start + loaded), signal)
+
+      if (status >= 200 && status < 300) {
+        index++
+        failures = 0
+        onRetry(null)
+        onProgress(Math.min(file.size, index * chunkBytes))
+        continue
+      }
+      if (status === 409 && typeof body.expected === 'number') {
+        index = body.expected // the server is ahead or behind: carry on from where it is
+        continue
+      }
+      // Network drop, server error, or a chunk that didn't arrive: wait and retry.
+      if (status === 0 || status >= 500 || status === 422 || status === 408 || status === 429) {
+        if (failures >= RETRY_DELAYS.length) {
+          throw new ApiError(status, body.message ?? 'The connection kept dropping. Please try again later.')
+        }
+        onRetry(`Connection problem, retrying (${failures + 1} of ${RETRY_DELAYS.length})…`)
+        await sleep(RETRY_DELAYS[failures], signal)
+        failures++
+        continue
+      }
+      throw new ApiError(status, body.message ?? `Upload failed (${status})`)
+    }
+
+    onRetry(null)
+    return await apiSend<{ name: string }>('POST', `/uploads/${id}/finish`)
+  } catch (error) {
+    // Tidy up on the server; ignore failures (abandoned uploads are cleared after a day).
+    void apiSend('DELETE', `/uploads/${id}`).catch(() => undefined)
+    throw error
+  }
 }
 
 // --- BBC iPlayer ---

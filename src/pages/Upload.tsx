@@ -17,6 +17,7 @@ interface Job {
   state: 'waiting' | 'uploading' | 'done' | 'failed'
   loaded: number
   error?: string
+  retrying?: string | null
 }
 
 let nextId = 1
@@ -29,7 +30,7 @@ export function Upload() {
   const folder = useUploadFolder()
   const queryClient = useQueryClient()
   const isAdmin = useMe().data?.roles.includes('admin') ?? false
-  const maxBytes = folder.data?.maxBytes ?? null
+  const chunkBytes = folder.data?.chunkBytes ?? 32 * 1024 * 1024
 
   const [jobs, setJobs] = useState<Job[]>([])
   const [dragging, setDragging] = useState(false)
@@ -49,11 +50,17 @@ export function Upload() {
       abort.current = controller
       update(job.id, { state: 'uploading' })
       try {
-        await uploadFile(job.file, (loaded) => update(job.id, { loaded }), controller.signal)
-        update(job.id, { state: 'done', loaded: job.file.size })
+        await uploadFile(
+          job.file,
+          chunkBytes,
+          (loaded) => update(job.id, { loaded }),
+          (retrying) => update(job.id, { retrying }),
+          controller.signal,
+        )
+        update(job.id, { state: 'done', loaded: job.file.size, retrying: null })
         queryClient.invalidateQueries({ queryKey: ['uploads'] })
       } catch (error) {
-        update(job.id, { state: 'failed', error: error instanceof ApiError ? error.message : 'Upload failed.' })
+        update(job.id, { state: 'failed', retrying: null, error: error instanceof ApiError ? error.message : 'Upload failed.' })
       }
     }
     abort.current = null
@@ -64,16 +71,9 @@ export function Upload() {
     if (!files || files.length === 0) return
     const added: Job[] = []
     for (const file of Array.from(files)) {
-      const tooBig = maxBytes !== null && file.size > maxBytes
-      const job: Job = {
-        id: nextId++,
-        file,
-        state: tooBig ? 'failed' : 'waiting',
-        loaded: 0,
-        error: tooBig ? `Too big: the server accepts up to ${formatBytes(maxBytes)}.` : undefined,
-      }
+      const job: Job = { id: nextId++, file, state: 'waiting', loaded: 0 }
       added.push(job)
-      if (!tooBig) queue.current.push(job)
+      queue.current.push(job)
     }
     setJobs((all) => [...added, ...all])
     void pump()
@@ -131,7 +131,7 @@ export function Upload() {
             </div>
             <Text weight="bold">Drop files here</Text>
             <Text size="2" color="gray">
-              or click to choose{maxBytes !== null && ` · up to ${formatBytes(maxBytes)} each`}
+              or click to choose · any size, and big files carry on if the connection drops
             </Text>
             <input
               ref={inputRef}
@@ -176,6 +176,11 @@ export function Upload() {
                     </Flex>
                   </Flex>
                   {job.state === 'uploading' && <Progress mt="2" value={(job.loaded / Math.max(job.file.size, 1)) * 100} />}
+                  {job.retrying && (
+                    <Text as="p" size="1" color="amber" mt="1">
+                      {job.retrying}
+                    </Text>
+                  )}
                   {job.error && (
                     <Text as="p" size="1" color="red" mt="1">
                       {job.error}
