@@ -45,6 +45,7 @@ export type SortBy = 'name' | 'date'
 export type SortDir = 'asc' | 'desc'
 
 export interface LibraryListing {
+  server: 'media02' | 'media01'
   path: string
   name: string
   breadcrumbs: Crumb[]

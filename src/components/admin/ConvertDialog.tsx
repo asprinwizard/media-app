@@ -1,22 +1,14 @@
-import { Badge, Button, Callout, Dialog, Flex, Select, Skeleton, Text } from '@radix-ui/themes'
+import { Button, Callout, Dialog, Flex, Select, Skeleton, Text } from '@radix-ui/themes'
 import { useState } from 'react'
-import { useConvertJobs, useConvertPresets, useStartConvert } from '../../api/admin'
+import { useConvertPresets, useStartConvert } from '../../api/admin'
 import type { LibraryItem } from '../../api/types'
-import { formatDate } from '../../lib/format'
+import { ConvertJobsList } from './ConvertJobsList'
 import { ResultList } from './ResultList'
-
-const STATUS_COLOR: Record<string, 'grass' | 'orange' | 'red' | 'gray'> = {
-  finished: 'grass',
-  processing: 'orange',
-  waiting: 'gray',
-  error: 'red',
-}
 
 /** Send files to CloudConvert with a preset, and watch recent jobs. */
 export function ConvertDialog({ folder, items, onClose }: { folder: string; items: LibraryItem[]; onClose: () => void }) {
   const presets = useConvertPresets(true)
   const configured = presets.data?.configured ?? false
-  const jobs = useConvertJobs(configured)
   const start = useStartConvert()
   const [preset, setPreset] = useState<string>('')
   const chosen = preset || presets.data?.presets[0]?.key || ''
@@ -77,38 +69,7 @@ export function ConvertDialog({ folder, items, onClose }: { folder: string; item
             </Callout.Root>
           )}
 
-          {configured && (
-            <Flex direction="column" gap="2">
-              <Text size="2" weight="bold">
-                Recent jobs {jobs.data?.active && <Badge color="orange">updating</Badge>}
-              </Text>
-              {jobs.error && (
-                <Text size="2" color="red">
-                  {jobs.error.message}
-                </Text>
-              )}
-              <Flex direction="column" gap="1" className="job-list">
-                {jobs.data?.jobs.length === 0 && (
-                  <Text size="2" color="gray">
-                    No recent jobs.
-                  </Text>
-                )}
-                {jobs.data?.jobs.slice(0, 8).map((job) => (
-                  <Flex key={job.id} align="center" justify="between" gap="3">
-                    <Text size="2" truncate>
-                      {job.tag ?? job.id}
-                    </Text>
-                    <Flex gap="2" align="center" flexShrink="0">
-                      <Text size="1" color="gray">
-                        {formatDate(job.created)}
-                      </Text>
-                      <Badge color={STATUS_COLOR[job.status] ?? 'gray'}>{job.status}</Badge>
-                    </Flex>
-                  </Flex>
-                ))}
-              </Flex>
-            </Flex>
-          )}
+          {configured && <ConvertJobsList />}
         </Flex>
 
         <Flex gap="3" mt="5" justify="end">

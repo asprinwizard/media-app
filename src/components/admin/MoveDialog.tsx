@@ -13,6 +13,8 @@ interface Props {
   items: LibraryItem[]
   media01Available: boolean
   media01Reason?: string | null
+  /** the server whose listing is on screen */
+  browsing: Server
   onClose: () => void
   onDone: (message: string) => void
 }
@@ -22,9 +24,9 @@ interface Props {
  * "Move/Rename Files" and "Move/Rename Folders" panels). File names start as
  * the smart suggestions, as before.
  */
-export function MoveDialog({ folder, items, media01Available, media01Reason, onClose, onDone }: Props) {
+export function MoveDialog({ folder, items, media01Available, media01Reason, browsing, onClose, onDone }: Props) {
   const move = useMoveItems()
-  const [server, setServer] = useState<Server>('media02')
+  const [server, setServer] = useState<Server>(browsing)
   const [where, setWhere] = useState<'same' | 'other'>('same')
   const [destination, setDestination] = useState(folder)
   const [newFolder, setNewFolder] = useState('')
@@ -64,7 +66,7 @@ export function MoveDialog({ folder, items, media01Available, media01Reason, onC
         </Dialog.Description>
 
         <Flex direction="column" gap="4">
-          <ServerToggle value={server} onChange={setServer} media01Available={media01Available} media01Reason={media01Reason} />
+          <ServerToggle value={server} onChange={setServer} media01Available={media01Available} media01Reason={media01Reason} locked={browsing === 'media01'} />
 
           <Flex direction="column" gap="2">
             <Text size="2" weight="bold">

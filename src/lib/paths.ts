@@ -10,10 +10,11 @@ function encodeSegments(path: string): string {
     .join('/')
 }
 
-/** SPA route for a library folder. */
-export function libraryRoute(path: string): string {
+/** SPA route for a library folder (admins can browse media01 with ?server=media01). */
+export function libraryRoute(path: string, server: 'media02' | 'media01' = 'media02'): string {
   const encoded = encodeSegments(path)
-  return encoded ? `/library/${encoded}` : '/library'
+  const route = encoded ? `/library/${encoded}` : '/library'
+  return server === 'media01' ? `${route}?server=media01` : route
 }
 
 /** Library path from the "*" splat of /library/* (React Router decodes it). */
@@ -41,4 +42,17 @@ export function parentPath(path: string): string {
   const parts = path.split('/').filter(Boolean)
   parts.pop()
   return parts.join('/')
+}
+
+const NO_PREFILL_UNDER = ['Uploaded Files', 'Torrent Downloads']
+
+/**
+ * Starting name for "New folder". As before it's the current folder's name
+ * (handy for "Show - Series 2"), but only inside a show or film folder:
+ * top-level and category folders (Movies, TV/Drama, Uploaded Files, …) start empty.
+ */
+export function suggestedFolderName(folder: string): string {
+  const segments = folder.split('/').filter(Boolean)
+  if (segments.length < 3 || NO_PREFILL_UNDER.includes(segments[0])) return ''
+  return segments.at(-1) ?? ''
 }

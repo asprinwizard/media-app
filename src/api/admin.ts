@@ -120,6 +120,7 @@ function useLibraryMutation<TBody, TResult>(path: string) {
     onSettled: () => {
       client.invalidateQueries({ queryKey: ['library'] })
       client.invalidateQueries({ queryKey: ['admin', 'folders'] })
+      client.invalidateQueries({ queryKey: ['admin', 'servers'] })
     },
   })
 }

@@ -1,12 +1,18 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { apiGet, apiSend } from './client'
+import { ApiError, apiGet, apiSend } from './client'
 import type { CastInfo, Dashboard, FileInfo, LibraryListing, PlayInfo, SearchResponse, SortBy, SortDir } from './types'
 
-export function useLibrary(path: string, sort: SortBy, dir: SortDir) {
+/**
+ * A folder listing: media02's library, or (admins) media01's copy of it.
+ * Keys start with 'library' so every file operation refreshes both.
+ */
+export function useLibrary(path: string, sort: SortBy, dir: SortDir, server: 'media02' | 'media01' = 'media02', enabled = true) {
   return useQuery({
-    queryKey: ['library', path, sort, dir],
-    queryFn: () => apiGet<LibraryListing>('/library', { path, sort, dir }),
+    queryKey: ['library', server, path, sort, dir],
+    queryFn: () => apiGet<LibraryListing>(server === 'media01' ? '/admin/media01/library' : '/library', { path, sort, dir }),
     placeholderData: keepPreviousData,
+    enabled,
+    retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 2,
   })
 }
 

@@ -1,6 +1,7 @@
 import { Button, Callout, Dialog, Flex, Text, TextField } from '@radix-ui/themes'
 import { useState, type FormEvent } from 'react'
 import { useCreateFolder, type Server } from '../../api/admin'
+import { suggestedFolderName } from '../../lib/paths'
 import { ServerToggle } from './ServerToggle'
 
 /** Create a sub-folder here, on media02 or media01. */
@@ -8,19 +9,21 @@ export function NewFolderDialog({
   folder,
   media01Available,
   media01Reason,
+  browsing,
   onClose,
   onDone,
 }: {
   folder: string
   media01Available: boolean
   media01Reason?: string | null
+  /** the server whose listing is on screen */
+  browsing: Server
   onClose: () => void
   onDone: (message: string) => void
 }) {
   const create = useCreateFolder()
-  const [server, setServer] = useState<Server>('media02')
-  // As before, start from the current folder's name (handy for "Series 2" etc.)
-  const [name, setName] = useState(folder.split('/').pop() ?? '')
+  const [server, setServer] = useState<Server>(browsing)
+  const [name, setName] = useState(() => suggestedFolderName(folder))
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -38,7 +41,7 @@ export function NewFolderDialog({
         </Dialog.Description>
         <form onSubmit={submit}>
           <Flex direction="column" gap="4">
-            <ServerToggle value={server} onChange={setServer} media01Available={media01Available} media01Reason={media01Reason} />
+            <ServerToggle value={server} onChange={setServer} media01Available={media01Available} media01Reason={media01Reason} locked={browsing === 'media01'} />
             <Flex direction="column" gap="1">
               <Text as="label" size="2" weight="bold" htmlFor="new-folder-name">
                 Name

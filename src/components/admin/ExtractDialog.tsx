@@ -12,12 +12,15 @@ export function ExtractDialog({
   initial,
   onClose,
   onDone,
+  onStarted,
 }: {
   folder: string
   archives: LibraryItem[]
   initial?: string
   onClose: () => void
   onDone: (message: string) => void
+  /** the page watches the job, so the list refreshes even if this is closed */
+  onStarted: (id: string, archive: string) => void
 }) {
   const start = useExtract()
   const [archive, setArchive] = useState(initial ?? archives[0]?.name ?? '')
@@ -27,7 +30,10 @@ export function ExtractDialog({
   const status = job.data?.status ?? start.data?.status
 
   const submit = () =>
-    start.mutate({ path: folder, name: archive, destination, newFolder: newFolder.trim() || undefined })
+    start.mutate(
+      { path: folder, name: archive, destination, newFolder: newFolder.trim() || undefined },
+      { onSuccess: (job) => onStarted(job.id, archive) },
+    )
 
   const finish = () => {
     if (status === 'done') onDone(`Extracted ${archive}.`)

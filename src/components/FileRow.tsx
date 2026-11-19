@@ -28,6 +28,8 @@ interface Props {
   selectable?: boolean
   selected?: boolean
   onSelect?: (selected: boolean) => void
+  /** Listing from media01 (admin browsing): folders open on media01, files are just names. */
+  server?: 'media02' | 'media01'
 }
 
 const playable = (type: ItemType) => type === 'video' || type === 'audio'
@@ -36,8 +38,9 @@ const playable = (type: ItemType) => type === 'video' || type === 'audio'
  * One library entry with its actions (port of the old list-group rows):
  * name opens the folder or the file itself, then Info / Cast / Download / Play.
  */
-export function FileRow({ item, label, showMeta = true, onPlay, onInfo, selectable, selected, onSelect }: Props) {
+export function FileRow({ item, label, showMeta = true, onPlay, onInfo, selectable, selected, onSelect, server = 'media02' }: Props) {
   const text = label ?? item.name
+  const remote = server === 'media01'
 
   // Clicking a file name logs "file link", then lets the browser open it
   // directly from Apache, as the old site did.
@@ -59,9 +62,11 @@ export function FileRow({ item, label, showMeta = true, onPlay, onInfo, selectab
       <FileTypeIcon type={item.type} />
 
       {item.type === 'folder' ? (
-        <Link className="row-name" to={libraryRoute(item.path)}>
+        <Link className="row-name" to={libraryRoute(item.path, server)}>
           {text}
         </Link>
+      ) : remote ? (
+        <Text className="row-name">{text}</Text>
       ) : item.type === 'broken' ? (
         <Text className="row-name" color="gray" title="The file this points to is missing">
           {text}
@@ -84,7 +89,7 @@ export function FileRow({ item, label, showMeta = true, onPlay, onInfo, selectab
       )}
 
       <span className="row-actions">
-        {playable(item.type) && (
+        {!remote && playable(item.type) && (
           <>
             <Tooltip content="File info">
               <IconButton size="1" variant="ghost" color="gray" aria-label={`Info for ${item.name}`} onClick={() => onInfo(item.path)}>
@@ -100,7 +105,7 @@ export function FileRow({ item, label, showMeta = true, onPlay, onInfo, selectab
             </Tooltip>
           </>
         )}
-        {item.type !== 'folder' && item.type !== 'broken' && (
+        {!remote && item.type !== 'folder' && item.type !== 'broken' && (
           <Tooltip content="Download">
             <IconButton size="1" asChild variant="ghost" color="gray" aria-label={`Download ${item.name}`}>
               <a href={downloadUrl(item.path)} download>
@@ -109,7 +114,7 @@ export function FileRow({ item, label, showMeta = true, onPlay, onInfo, selectab
             </IconButton>
           </Tooltip>
         )}
-        {playable(item.type) && (
+        {!remote && playable(item.type) && (
           <Tooltip content="Play">
             <IconButton size="1" variant="soft" aria-label={`Play ${item.name}`} onClick={() => onPlay(item.path)}>
               <Play size={16} />

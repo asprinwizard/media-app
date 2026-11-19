@@ -1,8 +1,8 @@
 import { Button, Flex, Separator, Text, Tooltip } from '@radix-ui/themes'
-import { ArrowRightLeft, FileArchive, FolderPlus, ListChecks, RefreshCw, Server, Trash2 } from 'lucide-react'
+import { ArrowRightLeft, FileArchive, FolderPlus, History, ListChecks, RefreshCw, Server, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-export type ManageAction = 'move' | 'copy' | 'convert' | 'extract' | 'folder' | 'delete' | 'queue'
+export type ManageAction = 'move' | 'copy' | 'convert' | 'extract' | 'folder' | 'delete' | 'queue' | 'conversions'
 
 interface Props {
   count: number
@@ -47,6 +47,7 @@ export function ManageBar({ count, can, reasons, onAction }: Props) {
       {button('extract', <FileArchive size={15} />, 'Extract')}
       {button('folder', <FolderPlus size={15} />, 'New folder')}
       {button('queue', <ListChecks size={15} />, 'Copy queue')}
+      {button('conversions', <History size={15} />, 'Conversions')}
       <span className="manage-spacer" />
       {button('delete', <Trash2 size={15} />, 'Delete', true)}
     </Flex>

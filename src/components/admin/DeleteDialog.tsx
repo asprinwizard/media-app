@@ -11,6 +11,7 @@ export function DeleteDialog({
   items,
   media01Available,
   media01Reason,
+  browsing,
   onClose,
   onDone,
 }: {
@@ -18,11 +19,13 @@ export function DeleteDialog({
   items: LibraryItem[]
   media01Available: boolean
   media01Reason?: string | null
+  /** the server whose listing is on screen */
+  browsing: Server
   onClose: () => void
   onDone: (message: string) => void
 }) {
   const remove = useDeleteItems()
-  const [server, setServer] = useState<Server>('media02')
+  const [server, setServer] = useState<Server>(browsing)
   const folders = items.filter((i) => i.type === 'folder').length
 
   const submit = async () => {
@@ -42,7 +45,7 @@ export function DeleteDialog({
           {folders > 0 && ', including everything inside the selected folders'}. It can't be undone.
         </AlertDialog.Description>
 
-        <ServerToggle value={server} onChange={setServer} media01Available={media01Available} media01Reason={media01Reason} />
+        <ServerToggle value={server} onChange={setServer} media01Available={media01Available} media01Reason={media01Reason} locked={browsing === 'media01'} />
 
         <ScrollArea type="auto" scrollbars="vertical" style={{ maxHeight: 180 }} mt="3">
           <ul className="result-list">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { castRoute, downloadUrl, libraryRoute, mediaUrl, parentPath, pathFromSplat } from './paths'
+import { castRoute, downloadUrl, libraryRoute, mediaUrl, parentPath, pathFromSplat, suggestedFolderName } from './paths'
 
 const odd = 'TV/Drama/Show/Odd #1 & 50% + x?.mp4'
 
@@ -7,6 +7,7 @@ describe('paths', () => {
   it('encodes each segment but keeps slashes', () => {
     expect(libraryRoute('TV/Drama/Harbour Lights')).toBe('/library/TV/Drama/Harbour%20Lights')
     expect(libraryRoute('')).toBe('/library')
+    expect(libraryRoute('TV/A B', 'media01')).toBe('/library/TV/A%20B?server=media01')
     expect(mediaUrl(odd)).toBe('/media/Video/TV/Drama/Show/Odd%20%231%20%26%2050%25%20%2B%20x%3F.mp4')
   })
 
@@ -20,5 +21,16 @@ describe('paths', () => {
     expect(pathFromSplat(undefined)).toBe('')
     expect(parentPath(odd)).toBe('TV/Drama/Show')
     expect(parentPath('Movies')).toBe('')
+  })
+})
+
+describe('suggestedFolderName', () => {
+  it('pre-fills only inside show/film folders', () => {
+    expect(suggestedFolderName('')).toBe('')
+    expect(suggestedFolderName('Uploaded Files')).toBe('')
+    expect(suggestedFolderName('Movies')).toBe('')
+    expect(suggestedFolderName('TV/Drama')).toBe('')
+    expect(suggestedFolderName('Uploaded Files/get_iplayer/Something')).toBe('')
+    expect(suggestedFolderName('TV/Drama/Harbour Lights')).toBe('Harbour Lights')
   })
 })

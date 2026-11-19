@@ -1,13 +1,15 @@
 import { Button, Callout, Card, Checkbox, Flex, IconButton, SegmentedControl, Skeleton, Spinner, Text, Tooltip } from '@radix-ui/themes'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronRight, CircleCheck, FolderOpen, ListChecks } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronRight, CircleCheck, CircleX, FolderOpen, ListChecks, RefreshCw, X } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
-import { useServers } from '../api/admin'
+import { useExtractJob, useServers, type Server } from '../api/admin'
 import { useLibrary } from '../api/hooks'
 import { useMe } from '../api/useMe'
 import type { LibraryItem, SortBy, SortDir } from '../api/types'
 import { ConvertDialog } from '../components/admin/ConvertDialog'
+import { ConvertJobsDialog } from '../components/admin/ConvertJobsDialog'
 import { CopyDialog } from '../components/admin/CopyDialog'
 import { CopyQueueDialog } from '../components/admin/CopyQueueDialog'
 import { DeleteDialog } from '../components/admin/DeleteDialog'
@@ -50,26 +52,66 @@ export function Library() {
   const [params, setParams] = useSearchParams()
   const sort: SortBy = params.get('sort') === 'date' ? 'date' : 'name'
   const dir: SortDir = params.get('dir') === 'desc' ? 'desc' : 'asc'
-  const { data, error, isPending, isFetching, isPlaceholderData } = useLibrary(path, sort, dir)
+  const isAdmin = useMe().data?.roles.includes('admin') ?? false
+  // Admins can browse media01's copy of the library (?server=media01), in Manage mode.
+  const browse: Server = isAdmin && params.get('server') === 'media01' ? 'media01' : 'media02'
+  const onMedia01 = browse === 'media01'
+  const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useLibrary(path, sort, dir, browse)
   const loading = isPending || (isFetching && isPlaceholderData)
   const slow = useDelayedFlag(loading, 1200)
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const [playing, setPlaying] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
   // --- Manage mode (admins) ---
-  const isAdmin = useMe().data?.roles.includes('admin') ?? false
-  const [manage, setManage] = useState(false)
+  const [manageOn, setManage] = useState(false)
+  const manage = manageOn || onMedia01
   // Selection belongs to one folder; moving elsewhere starts afresh.
   const [selection, setSelection] = useState<{ path: string; names: Set<string> }>({ path, names: new Set() })
   const selectedNames = selection.path === path ? selection.names : new Set<string>()
   const [dialog, setDialog] = useState<ManageAction | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const servers = useServers(path, manage && isAdmin)
-  const media01Available = servers.data?.media01 ?? false
+  const folderOnMedia01 = onMedia01 || (servers.data?.media01 ?? false)
 
   const items = data && !isPlaceholderData ? data.items : []
   const selected = items.filter((i) => selectedNames.has(i.name))
+
+  // Browsing media02: media01 is only offered for items that are also there.
+  const twin = useLibrary(path, 'name', 'asc', 'media01', manage && !onMedia01 && folderOnMedia01)
+  const twinNames = twin.data && !twin.isPlaceholderData && twin.data.path === path ? new Set(twin.data.items.map((i) => i.name)) : null
+  const missing = twinNames ? selected.filter((i) => !twinNames.has(i.name)) : []
+  const itemsOnMedia01 = folderOnMedia01 && twinNames !== null && missing.length === 0
+  const folderReason = servers.data?.media01Error ?? null
+  const itemsReason = !folderOnMedia01
+    ? folderReason
+    : twin.error
+      ? twin.error.message
+      : !twinNames
+        ? 'Checking what is on media01…'
+        : missing.length === 1
+          ? `"${missing[0].name}" isn't on media01, so only media02 is available.`
+          : missing.length > 1
+            ? `${missing.length} of the selected items aren't on media01, so only media02 is available.`
+            : null
+
+  // Extractions carry on after their dialog closes; refresh the list when one ends.
+  const [extracting, setExtracting] = useState<{ id: string; archive: string } | null>(null)
+  const extractJob = useExtractJob(extracting?.id ?? null)
+  const extractStatus = extractJob.data?.status
+  useEffect(() => {
+    if (extractStatus === 'done' || extractStatus === 'failed') {
+      queryClient.invalidateQueries({ queryKey: ['library'] })
+    }
+  }, [extractStatus, queryClient])
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin', 'servers'] })
+    queryClient.invalidateQueries({ queryKey: ['library', 'media01', path] })
+    refetch()
+  }
   const select = (name: string, on: boolean) => {
     const next = new Set(selectedNames)
     if (on) next.add(name)
@@ -80,20 +122,22 @@ export function Library() {
 
   const files = selected.filter((i) => i.type !== 'folder' && i.type !== 'broken')
   const archives = items.filter((i) => i.type === 'compressed')
+  const media02Only = 'Only when browsing media02'
   const can: Record<ManageAction, boolean> = {
     move: selected.length > 0,
-    copy: files.length > 0 && files.length === selected.length,
-    convert: selected.some((i) => i.type === 'video'),
-    extract: archives.length > 0,
+    copy: !onMedia01 && files.length > 0 && files.length === selected.length,
+    convert: !onMedia01 && selected.some((i) => i.type === 'video'),
+    extract: !onMedia01 && archives.length > 0,
     folder: true,
     delete: selected.length > 0,
     queue: true,
+    conversions: true,
   }
   const reasons: Partial<Record<ManageAction, string>> = {
     move: 'Select files or folders first',
-    copy: selected.length === 0 ? 'Select files first' : 'Only files can be copied (not folders)',
-    convert: 'Select video files first',
-    extract: 'There are no archives in this folder',
+    copy: onMedia01 ? media02Only : selected.length === 0 ? 'Select files first' : 'Only files can be copied (not folders)',
+    convert: onMedia01 ? media02Only : 'Select video files first',
+    extract: onMedia01 ? media02Only : 'There are no archives in this folder',
     delete: 'Select files or folders first',
   }
   const done = (message: string) => {
@@ -103,8 +147,9 @@ export function Library() {
   }
   const dialogProps = {
     folder: path,
-    media01Available,
-    media01Reason: servers.data?.media01Error,
+    browsing: browse,
+    media01Available: itemsOnMedia01,
+    media01Reason: itemsReason,
     onClose: () => setDialog(null),
     onDone: done,
   }
@@ -118,9 +163,18 @@ export function Library() {
   const setSort = (next: Partial<{ sort: SortBy; dir: SortDir }>) => {
     const merged = { sort, dir, ...next }
     const search = new URLSearchParams()
+    if (onMedia01) search.set('server', 'media01')
     if (merged.sort !== 'name') search.set('sort', merged.sort)
     if (merged.dir !== 'asc') search.set('dir', merged.dir)
     setParams(search, { replace: true })
+  }
+
+  const browseServer = (server: Server) => {
+    const search = new URLSearchParams(params)
+    if (server === 'media01') search.set('server', 'media01')
+    else search.delete('server')
+    setManage(true)
+    navigate({ search: search.toString() ? `?${search}` : '' })
   }
 
   // Jump to the top as soon as another folder is opened, so the loading
@@ -141,7 +195,7 @@ export function Library() {
     <>
       <PageHeader
         title={path ? title : 'Library'}
-        description={path ? undefined : 'Everything on media02, folder by folder.'}
+        description={onMedia01 ? 'Browsing media01, the archive server.' : path ? undefined : 'Everything on media02, folder by folder.'}
         actions={
           <>
             <SegmentedControl.Root value={sort} onValueChange={(value) => setSort({ sort: value as SortBy })} aria-label="Sort by">
@@ -153,6 +207,7 @@ export function Library() {
                 variant={manage ? 'solid' : 'outline'}
                 color={manage ? undefined : 'gray'}
                 onClick={() => {
+                  if (onMedia01) browseServer('media02')
                   setManage(!manage)
                   selectAll(false)
                 }}
@@ -161,6 +216,11 @@ export function Library() {
                 <ListChecks size={16} /> {manage ? 'Done' : 'Manage'}
               </Button>
             )}
+            <Tooltip content="Refresh this folder">
+              <IconButton variant="outline" color="gray" aria-label="Refresh" onClick={refresh} disabled={isFetching}>
+                <RefreshCw size={16} className={isFetching && !loading ? 'spin' : undefined} />
+              </IconButton>
+            </Tooltip>
             <Tooltip content={dir === 'asc' ? 'Ascending (click to reverse)' : 'Descending (click to reverse)'}>
               <IconButton
                 variant="outline"
@@ -184,11 +244,48 @@ export function Library() {
                 {crumb.name}
               </Text>
             ) : (
-              <Link to={libraryRoute(crumb.path)}>{crumb.name}</Link>
+              <Link to={libraryRoute(crumb.path, browse)}>{crumb.name}</Link>
             )}
           </Fragment>
         ))}
       </nav>
+
+      {manage && (onMedia01 || folderOnMedia01) && (
+        <Flex align="center" gap="3" mb="3" wrap="wrap">
+          <Text size="2" weight="bold">
+            Browsing
+          </Text>
+          <SegmentedControl.Root value={browse} onValueChange={(v) => browseServer(v as Server)} aria-label="Browse server">
+            <SegmentedControl.Item value="media02">media02</SegmentedControl.Item>
+            <SegmentedControl.Item value="media01">media01</SegmentedControl.Item>
+          </SegmentedControl.Root>
+          {onMedia01 && (
+            <Text size="2" color="red">
+              Archive server: changes here apply to media01.
+            </Text>
+          )}
+        </Flex>
+      )}
+
+      {extracting && dialog !== 'extract' && (
+        <Callout.Root color={extractStatus === 'done' ? 'grass' : extractStatus === 'failed' ? 'red' : 'blue'} mb="3" role="status">
+          <Callout.Icon>
+            {extractStatus === 'done' ? <CircleCheck size={16} /> : extractStatus === 'failed' ? <CircleX size={16} /> : <Spinner size="1" />}
+          </Callout.Icon>
+          <Callout.Text>
+            {extractStatus === 'done'
+              ? `Extracted ${extracting.archive}.`
+              : extractStatus === 'failed'
+                ? `Extracting ${extracting.archive} failed: ${extractJob.data?.error ?? 'unknown error'}`
+                : `Extracting ${extracting.archive} in the background…`}{' '}
+            {(extractStatus === 'done' || extractStatus === 'failed') && (
+              <IconButton size="1" variant="ghost" color="gray" aria-label="Dismiss" onClick={() => setExtracting(null)}>
+                <X size={14} />
+              </IconButton>
+            )}
+          </Callout.Text>
+        </Callout.Root>
+      )}
 
       {flash && (
         <Callout.Root color="grass" mb="3" role="status">
@@ -205,7 +302,7 @@ export function Library() {
             <FolderOpen size={16} />
           </Callout.Icon>
           <Callout.Text>
-            {error instanceof ApiError && error.status === 404 ? 'This folder no longer exists.' : error.message}{' '}
+            {error instanceof ApiError && error.status === 404 && !onMedia01 ? 'This folder no longer exists.' : error.message}{' '}
             <Link to="/library">Back to the library</Link>
           </Callout.Text>
         </Callout.Root>
@@ -266,6 +363,7 @@ export function Library() {
                         selectable={manage}
                         selected={selectedNames.has(item.name)}
                         onSelect={(on) => select(item.name, on)}
+                        server={browse}
                       />
                     </Fragment>
                   )
@@ -296,13 +394,18 @@ export function Library() {
       )}
       {dialog === 'move' && <MoveDialog {...dialogProps} items={selected} />}
       {dialog === 'delete' && <DeleteDialog {...dialogProps} items={selected} />}
-      {dialog === 'folder' && <NewFolderDialog {...dialogProps} />}
+      {dialog === 'folder' && (
+        <NewFolderDialog {...dialogProps} media01Available={folderOnMedia01} media01Reason={folderReason} />
+      )}
+      {dialog === 'conversions' && <ConvertJobsDialog onClose={() => setDialog(null)} />}
       {dialog === 'copy' && <CopyDialog folder={path} items={files} onClose={() => setDialog(null)} onShowQueue={() => setDialog('queue')} />}
       {dialog === 'queue' && <CopyQueueDialog onClose={() => setDialog(null)} />}
       {dialog === 'convert' && <ConvertDialog folder={path} items={selected.filter((i) => i.type === 'video')} onClose={() => setDialog(null)} />}
       {dialog === 'extract' && (
         <ExtractDialog
           {...dialogProps}
+          onDone={() => setSelection({ path, names: new Set() })}
+          onStarted={(id, archive) => setExtracting({ id, archive })}
           archives={archives}
           initial={selected.find((i) => i.type === 'compressed')?.name}
         />
