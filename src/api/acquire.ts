@@ -128,7 +128,7 @@ export interface IplayerResult {
 }
 
 export interface IplayerTrack {
-  status: 'temp' | 'encoding' | 'audio' | 'video' | 'completed' | 'stalled'
+  status: 'downloading' | 'audio' | 'converting' | 'finishing' | 'tagging' | 'completed' | 'stalled'
   label: string
   file: string
   size: number | null

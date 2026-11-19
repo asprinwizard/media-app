@@ -8,13 +8,19 @@ import { PageHeader } from '../components/PageHeader'
 import { formatBytes } from '../lib/format'
 import { libraryRoute } from '../lib/paths'
 
-const TRACK_COLOR: Record<IplayerTrack['status'], 'blue' | 'orange' | 'grass' | 'red' | 'gray'> = {
-  temp: 'red',
-  encoding: 'orange',
+const TRACK_COLOR: Record<IplayerTrack['status'], 'blue' | 'orange' | 'amber' | 'grass' | 'gray'> = {
+  downloading: 'blue',
   audio: 'blue',
-  video: 'blue',
+  converting: 'orange',
+  finishing: 'orange',
+  tagging: 'amber',
   completed: 'grass',
   stalled: 'gray',
+}
+
+/** Shown under a track while it's at a stage that looks stuck but isn't. */
+const TRACK_HINT: Partial<Record<IplayerTrack['status'], string>> = {
+  finishing: 'ffmpeg is rewriting the file to make it stream well. It takes a few minutes and the size doesn’t change.',
 }
 
 function Options({
@@ -63,7 +69,12 @@ function Track({ title, track }: { title: string; track: IplayerTrack }) {
           )}
         </Badge>
       </Flex>
-      {inProgress && <Progress mt="2" size="1" value={percent ?? undefined} color={track.status === 'encoding' ? 'orange' : undefined} />}
+      {inProgress && <Progress mt="2" size="1" value={percent ?? undefined} color={TRACK_COLOR[track.status] === 'blue' ? undefined : TRACK_COLOR[track.status]} />}
+      {TRACK_HINT[track.status] && (
+        <Text as="p" size="1" color="gray" mt="1">
+          {TRACK_HINT[track.status]}
+        </Text>
+      )}
     </div>
   )
 }
