@@ -1,10 +1,11 @@
 import { Button, Card, Flex, Grid, Heading, Text } from '@radix-ui/themes'
-import { Film, Search } from 'lucide-react'
+import { Clock, Film, Search } from 'lucide-react'
+import { useDashboard } from '../api/hooks'
 import { Link } from 'react-router'
 import type { Me } from '../api/types'
 import { navIcons } from '../components/navIcons'
 import { useState } from 'react'
-import { greeting } from '../lib/format'
+import { formatDateLong, greeting } from '../lib/format'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 const TILE_TEXT: Record<string, string> = {
@@ -22,6 +23,7 @@ const TILE_TEXT: Record<string, string> = {
 export function Home({ me }: { me: Me }) {
   const tiles = me.menu.filter((item) => item.key !== 'home')
   const [hello] = useState(() => greeting(new Date().getHours()))
+  const dashboard = useDashboard(me.roles.includes('admin'))
   useDocumentTitle()
 
   return (
@@ -71,6 +73,25 @@ export function Home({ me }: { me: Me }) {
           )
         })}
       </Grid>
+
+      {dashboard.data && dashboard.data.logs.length > 0 && (
+        <Grid columns={{ initial: '1', md: '2' }} gap="4" mt="5">
+          {dashboard.data.logs.map((log) => (
+            <Card key={log.name} size="2">
+              <Flex align="center" gap="2" mb="2">
+                <Clock size={16} aria-hidden />
+                <Heading as="h2" size="3">
+                  Latest {log.title} copies to media01
+                </Heading>
+              </Flex>
+              <Text as="p" size="1" color="gray" mb="2">
+                {log.modified ? `Log updated ${formatDateLong(log.modified)}` : 'Log file not found'}
+              </Text>
+              <pre className="log-tail">{log.lines.join('\n') || 'Nothing logged yet.'}</pre>
+            </Card>
+          ))}
+        </Grid>
+      )}
     </>
   )
 }

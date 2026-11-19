@@ -44,3 +44,18 @@ export function initials(name: string): string {
   const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)
   return letters.toUpperCase()
 }
+
+const shortDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+const shortDateTime = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const longDateTime = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeStyle: 'short' })
+
+/** "18 Nov, 21:04" this year, "3 Mar 2024" otherwise. */
+export function formatDate(unixSeconds: number | null | undefined, now: Date = new Date()): string {
+  if (!unixSeconds) return ''
+  const date = new Date(unixSeconds * 1000)
+  return date.getFullYear() === now.getFullYear() ? shortDateTime.format(date) : shortDate.format(date)
+}
+
+export function formatDateLong(unixSeconds: number | null | undefined): string {
+  return unixSeconds ? longDateTime.format(new Date(unixSeconds * 1000)) : ''
+}

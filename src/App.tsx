@@ -4,7 +4,11 @@ import type { Me } from './api/types'
 import { useMe } from './api/useMe'
 import { AppShell } from './components/AppShell'
 import { canSee } from './lib/format'
+import { Cast } from './pages/Cast'
+import { Help } from './pages/Help'
 import { Home } from './pages/Home'
+import { Library } from './pages/Library'
+import { Search } from './pages/Search'
 import { ComingSoon, FullPageError, FullPageLoading, NoAccess, NotFound } from './pages/StatusPages'
 
 /** Hide a route from users whose menu (from the API) doesn't include it. */
@@ -28,10 +32,10 @@ export default function App() {
     <Routes>
       <Route element={<AppShell me={me} />}>
         <Route index element={<Home me={me} />} />
-        <Route path="library/*" element={guarded('library', 'Library', 2)} />
-        <Route path="search" element={guarded('search', 'Search', 2)} />
-        <Route path="help" element={guarded('help', 'Help', 2)} />
-        <Route path="cast" element={<ComingSoon title="Cast" phase={2} />} />
+        <Route path="library/*" element={<Library />} />
+        <Route path="search" element={<Search />} />
+        <Route path="help" element={<Help />} />
+        <Route path="cast" element={<Cast />} />
         <Route path="upload" element={guarded('upload', 'Upload', 4)} />
         <Route path="iplayer" element={guarded('iplayer', 'BBC iPlayer', 4)} />
         <Route path="youtube" element={guarded('youtube', 'YouTube', 4)} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canSee, formatBytes, greeting, initials, roleChip } from './format'
+import { canSee, formatBytes, formatDate, greeting, initials, roleChip } from './format'
 import type { MenuItem } from '../api/types'
 
 describe('greeting', () => {
@@ -44,5 +44,15 @@ describe('canSee / initials', () => {
   it('makes initials', () => {
     expect(initials('richard')).toBe('RI')
     expect(initials('alice smith')).toBe('AS')
+  })
+})
+
+
+describe('formatDate', () => {
+  const now = new Date('2026-11-19T12:00:00')
+  it('shows time for this year and the year otherwise', () => {
+    expect(formatDate(new Date('2026-11-18T21:04:00').getTime() / 1000, now)).toBe('18 Nov, 21:04')
+    expect(formatDate(new Date('2024-03-03T10:00:00').getTime() / 1000, now)).toBe('3 Mar 2024')
+    expect(formatDate(null, now)).toBe('')
   })
 })
