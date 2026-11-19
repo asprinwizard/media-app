@@ -1,4 +1,5 @@
 import { IconButton, Kbd } from '@radix-ui/themes'
+import { useIsFetching } from '@tanstack/react-query'
 import { Menu, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router'
@@ -13,6 +14,8 @@ function isTyping(target: EventTarget | null): boolean {
 export function AppShell({ me }: { me: Me }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+  // Background polls (job status, live logs) set meta.background and don't count
+  const loading = useIsFetching({ predicate: (query) => !query.meta?.background }) > 0
 
   // "/" jumps to search from anywhere (except while typing).
   useEffect(() => {
@@ -51,6 +54,7 @@ export function AppShell({ me }: { me: Me }) {
             <span>Search the library…</span>
             <Kbd className="cmdk-kbd">/</Kbd>
           </button>
+          <div className={`topbar-progress${loading ? ' active' : ''}`} role="progressbar" aria-hidden={!loading} aria-label="Loading" />
         </header>
         <main className="content">
           <Outlet />

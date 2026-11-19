@@ -1,6 +1,6 @@
-import { Callout, Card, Flex, IconButton, SegmentedControl, Skeleton, Text, Tooltip } from '@radix-ui/themes'
+import { Callout, Card, Flex, IconButton, SegmentedControl, Skeleton, Spinner, Text, Tooltip } from '@radix-ui/themes'
 import { ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronRight, FolderOpen } from 'lucide-react'
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
 import { useLibrary } from '../api/hooks'
@@ -11,6 +11,7 @@ import { PageHeader } from '../components/PageHeader'
 import { PlayerDialog } from '../components/PlayerDialog'
 import { formatBytes } from '../lib/format'
 import { libraryRoute, pathFromSplat } from '../lib/paths'
+import { useDelayedFlag } from '../lib/useDelayedFlag'
 import { scrollToLetter, useTypeToJump } from '../lib/useTypeToJump'
 
 const RAIL = ['#', ...'abcdefghijklmnopqrstuvwxyz'.split('')]
@@ -39,7 +40,9 @@ export function Library() {
   const [params, setParams] = useSearchParams()
   const sort: SortBy = params.get('sort') === 'date' ? 'date' : 'name'
   const dir: SortDir = params.get('dir') === 'desc' ? 'desc' : 'asc'
-  const { data, error, isPending, isPlaceholderData } = useLibrary(path, sort, dir)
+  const { data, error, isPending, isFetching, isPlaceholderData } = useLibrary(path, sort, dir)
+  const loading = isPending || (isFetching && isPlaceholderData)
+  const slow = useDelayedFlag(loading, 1200)
 
   const [playing, setPlaying] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -58,8 +61,19 @@ export function Library() {
     setParams(search, { replace: true })
   }
 
-  const title = data?.name ?? (path.split('/').pop() || 'Library')
-  const crumbs = data?.breadcrumbs ?? [{ name: 'Video', path: '' }]
+  // Jump to the top as soon as another folder is opened, so the loading
+  // message is visible while it loads.
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [path])
+
+  // Title and breadcrumbs come from the address, so they update immediately.
+  const segments = path.split('/').filter(Boolean)
+  const title = segments.at(-1) ?? 'Library'
+  const crumbs = [
+    { name: 'Video', path: '' },
+    ...segments.map((name, i) => ({ name, path: segments.slice(0, i + 1).join('/') })),
+  ]
 
   return (
     <>
@@ -113,13 +127,20 @@ export function Library() {
         </Callout.Root>
       ) : (
         <div className="lib">
-          <Card size="1" className="lib-card" style={{ opacity: isPlaceholderData ? 0.6 : 1 }}>
-            <Flex className="lib-toolbar" align="center" justify="between">
-              <Skeleton loading={isPending}>
+          <Card size="1" className={`lib-card${isPlaceholderData ? ' is-stale' : ''}`} aria-busy={loading}>
+            <Flex className="lib-toolbar" align="center" justify="between" gap="3">
+              {loading ? (
+                <Flex align="center" gap="2" role="status" aria-live="polite">
+                  <Spinner size="1" />
+                  <Text size="1" color={slow ? 'amber' : 'gray'} weight={slow ? 'medium' : 'regular'}>
+                    {slow ? 'Waking up the drives — this can take a few seconds…' : 'Loading…'}
+                  </Text>
+                </Flex>
+              ) : (
                 <Text size="1" color="gray">
-                  {data ? summary(data.items) : 'Loading folder'}
+                  {data ? summary(data.items) : ''}
                 </Text>
-              </Skeleton>
+              )}
               <Text size="1" color="gray" className="hide-sm">
                 Type a letter to jump
               </Text>
