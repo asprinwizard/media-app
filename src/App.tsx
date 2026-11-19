@@ -9,10 +9,13 @@ import { Help } from './pages/Help'
 import { Home } from './pages/Home'
 import { Iplayer } from './pages/Iplayer'
 import { Library } from './pages/Library'
+import { LiveTv } from './pages/LiveTv'
+import { Logs } from './pages/Logs'
 import { Search } from './pages/Search'
+import { Tools } from './pages/Tools'
 import { Upload } from './pages/Upload'
 import { Youtube } from './pages/Youtube'
-import { ComingSoon, FullPageError, FullPageLoading, NoAccess, NotFound } from './pages/StatusPages'
+import { FullPageError, FullPageLoading, NoAccess, NotFound } from './pages/StatusPages'
 
 /** Hide a route from users whose menu (from the API) doesn't include it. */
 function Guard({ me, menuKey, children }: { me: Me; menuKey: string; children: ReactNode }) {
@@ -25,11 +28,6 @@ export default function App() {
   if (isPending) return <FullPageLoading />
   if (error || !me) return <FullPageError error={error} onRetry={() => refetch()} />
 
-  const guarded = (key: string, title: string, phase: number) => (
-    <Guard me={me} menuKey={key}>
-      <ComingSoon title={title} phase={phase} />
-    </Guard>
-  )
 
   return (
     <Routes>
@@ -42,9 +40,9 @@ export default function App() {
         <Route path="upload" element={<Guard me={me} menuKey="upload"><Upload /></Guard>} />
         <Route path="iplayer" element={<Guard me={me} menuKey="iplayer"><Iplayer /></Guard>} />
         <Route path="youtube" element={<Guard me={me} menuKey="youtube"><Youtube /></Guard>} />
-        <Route path="live-tv" element={guarded('live-tv', 'Live TV', 5)} />
-        <Route path="logs" element={guarded('logs', 'Logs', 5)} />
-        <Route path="tools/*" element={guarded('tools', 'Tools', 5)} />
+        <Route path="live-tv" element={<Guard me={me} menuKey="live-tv"><LiveTv /></Guard>} />
+        <Route path="logs" element={<Guard me={me} menuKey="logs"><Logs /></Guard>} />
+        <Route path="tools/*" element={<Guard me={me} menuKey="tools"><Tools /></Guard>} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
