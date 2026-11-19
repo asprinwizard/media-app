@@ -1,5 +1,5 @@
 import { Badge, Button, Callout, Card, Checkbox, Flex, Heading, IconButton, Progress, Spinner, Text, TextField } from '@radix-ui/themes'
-import { CircleCheck, Search as SearchIcon, X } from 'lucide-react'
+import { CircleCheck, ExternalLink, Search as SearchIcon, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { useIplayerDownload, useIplayerSearch, useIplayerStatus, type IplayerResult, type IplayerTrack } from '../api/acquire'
@@ -163,7 +163,11 @@ export function Iplayer() {
         title="BBC iPlayer"
         description={
           <>
-            Downloads land in{' '}
+            Find programmes on{' '}
+            <a href="https://www.bbc.co.uk/iplayer" target="_blank" rel="noopener noreferrer">
+              BBC iPlayer <ExternalLink size={13} aria-label="(opens in a new tab)" className="ext-icon" />
+            </a>
+            . Downloads land in{' '}
             {isAdmin ? <Link to={libraryRoute('Uploaded Files/get_iplayer')}>Uploaded Files / get_iplayer</Link> : 'Uploaded Files / get_iplayer'}.
           </>
         }

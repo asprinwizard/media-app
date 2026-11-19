@@ -1,5 +1,5 @@
 import { Badge, Button, Callout, Card, Flex, Heading, Progress, Spinner, Table, Text, TextField } from '@radix-ui/themes'
-import { CircleCheck, CircleX, Download, ListVideo, Link as LinkIcon } from 'lucide-react'
+import { CircleCheck, CircleX, Download, ExternalLink, ListVideo, Link as LinkIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { useYoutubeDownload, useYoutubeInfo, useYoutubeStatus, type YoutubeFormat } from '../api/acquire'
@@ -172,7 +172,11 @@ export function Youtube() {
         title="YouTube"
         description={
           <>
-            Downloads land in <Link to={libraryRoute('Uploaded Files/youtube')}>Uploaded Files / youtube</Link> / &lt;channel&gt;.
+            Paste a link from{' '}
+            <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">
+              YouTube <ExternalLink size={13} aria-label="(opens in a new tab)" className="ext-icon" />
+            </a>
+            . Downloads land in <Link to={libraryRoute('Uploaded Files/youtube')}>Uploaded Files / youtube</Link> / &lt;channel&gt;.
           </>
         }
       />
