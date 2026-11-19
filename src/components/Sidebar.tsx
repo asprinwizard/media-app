@@ -1,8 +1,9 @@
 import { Avatar, Badge, Flex, IconButton, Text, Tooltip } from '@radix-ui/themes'
-import { Monitor, Moon, Play, Sun } from 'lucide-react'
+import { LogOut, Monitor, Moon, Play, Sun } from 'lucide-react'
 import { NavLink } from 'react-router'
 import type { Me, MenuGroup } from '../api/types'
 import { initials, roleChip } from '../lib/format'
+import { signOut } from '../lib/signOut'
 import { useThemePreference, type ThemePreference } from '../theme/context'
 import { navGroupLabels, navIcons } from './navIcons'
 
@@ -88,6 +89,11 @@ export function Sidebar({ me, onNavigate }: { me: Me; onNavigate?: () => void })
             onClick={() => setPreference(NEXT_THEME[preference])}
           >
             <ThemeIcon size={16} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip content="Sign out">
+          <IconButton variant="ghost" color="gray" aria-label="Sign out" onClick={() => void signOut()}>
+            <LogOut size={16} />
           </IconButton>
         </Tooltip>
       </Flex>
