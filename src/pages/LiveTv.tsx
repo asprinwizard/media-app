@@ -91,18 +91,21 @@ function HlsPlayer({ src, containerRef }: { src: string; containerRef: React.Ref
  */
 export function LiveTv() {
   const [waitingSince, setWaitingSince] = useState<number | null>(null)
-  const status = useLiveTvStatus(waitingSince !== null)
+  // Put to sleep or shut down from this page: stop checking on the box
+  // entirely until it's woken from here (a check can wake it by itself).
+  const [parked, setParked] = useState<'sleep' | 'shutdown' | null>(null)
+  const status = useLiveTvStatus(waitingSince !== null, parked === null)
   const action = useLiveTvAction()
   const [confirm, setConfirm] = useState<Exclude<LiveTvAction, 'wake'> | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
-  // After reboot/sleep/shutdown the box takes a few seconds to go down, so
-  // "online" answers are ignored for a short while.
+  // After a reboot the box takes a few seconds to go down, so "online"
+  // answers are ignored for a short while.
   const [quietUntil, setQuietUntil] = useState(0)
   const autoWoken = useRef(false)
   const frameRef = useRef<HTMLDivElement>(null)
 
-  const online = (status.data?.online ?? false) && now >= quietUntil
+  const online = parked === null && (status.data?.online ?? false) && now >= quietUntil
   const timeout = (status.data?.bootTimeout ?? 120) * 1000
   const waiting = waitingSince !== null && !online && now - waitingSince < timeout
   const timedOut = waitingSince !== null && !online && now - waitingSince >= timeout
@@ -115,6 +118,7 @@ export function LiveTv() {
 
   const wake = useCallback(() => {
     setNotice(null)
+    setParked(null)
     action.mutate('wake', { onSuccess: startWaiting })
   }, [action, startWaiting])
 
@@ -158,23 +162,24 @@ export function LiveTv() {
     setNotice(null)
     action.mutate(a, {
       onSuccess: () => {
-        const started = Date.now()
-        setNow(started)
-        setQuietUntil(started + (a === 'reboot' ? 20_000 : 12_000))
         if (a === 'reboot') {
+          const started = Date.now()
+          setNow(started)
+          setQuietUntil(started + 20_000)
           startWaiting()
           setNotice('Rebooting: the stream comes back when the box is up again.')
         } else {
           setWaitingSince(null)
-          setNotice(a === 'sleep' ? 'The box is going to sleep.' : 'The box is shutting down.')
-          window.setTimeout(() => void status.refetch(), 12_500)
+          setParked(a)
         }
       },
     })
   }
 
   const elapsed = waitingSince ? Math.floor((now - waitingSince) / 1000) : 0
-  const badge = status.isPending ? (
+  const badge = parked ? (
+    <Badge color="gray">{parked === 'sleep' ? 'Asleep' : 'Shut down'}</Badge>
+  ) : status.isPending ? (
     <Badge color="gray">
       <Spinner size="1" /> Checking
     </Badge>
@@ -251,7 +256,18 @@ export function LiveTv() {
         <Card size="3" className="tv-placeholder">
           <Flex direction="column" align="center" gap="3" py="6">
             <Tv size={36} aria-hidden />
-            {status.isPending && <Text color="gray">Checking whether the Live TV box is awake…</Text>}
+            {parked && (
+              <>
+                <Text weight="medium">{parked === 'sleep' ? 'The Live TV box is asleep.' : 'The Live TV box has been shut down.'}</Text>
+                <Text size="2" color="gray" style={{ maxWidth: 460 }}>
+                  This page leaves it alone until you wake it: even checking on the box can wake it up.
+                </Text>
+                <Button onClick={wake} loading={action.isPending}>
+                  <Sun size={15} /> Wake it up
+                </Button>
+              </>
+            )}
+            {!parked && status.isPending && <Text color="gray">Checking whether the Live TV box is awake…</Text>}
             {waiting && (
               <>
                 <Text weight="medium">Waking the Live TV box…</Text>
@@ -274,7 +290,7 @@ export function LiveTv() {
                 </Button>
               </>
             )}
-            {!status.isPending && !waiting && !timedOut && !online && (
+            {!parked && !status.isPending && !waiting && !timedOut && !online && (
               <>
                 <Text weight="medium">The Live TV box is offline.</Text>
                 {status.data?.canWake ? (

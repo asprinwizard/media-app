@@ -13,13 +13,20 @@ export interface LiveTvStatus {
 
 export type LiveTvAction = 'wake' | 'shutdown' | 'reboot' | 'sleep'
 
-/** Polls every 5 s while `waiting` (the box is booting), otherwise on demand. */
-export function useLiveTvStatus(waiting: boolean) {
+/**
+ * Polls every 5 s while `waiting` (the box is booting), otherwise on demand.
+ * `enabled: false` stops all checks: after Sleep or Shut down, because the
+ * check itself (a connection to the box) can wake it.
+ */
+export function useLiveTvStatus(waiting: boolean, enabled = true) {
   return useQuery({
     queryKey: ['live-tv', 'status'],
     queryFn: () => apiGet<LiveTvStatus>('/live-tv/status'),
     meta: { background: true },
-    refetchInterval: waiting ? 5000 : false,
+    enabled,
+    refetchInterval: waiting && enabled ? 5000 : false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 }
 
