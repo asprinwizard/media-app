@@ -1,19 +1,20 @@
 import { Button, Callout, Flex, Spinner, Text } from '@radix-ui/themes'
-import { Cast as CastIcon, Info } from 'lucide-react'
+import { Cast as CastIcon, Info, Square } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useCast } from '../api/hooks'
 import { PageHeader } from '../components/PageHeader'
+import { castToDevice, loadCastSdk, stopCasting } from '../lib/googleCast'
 
-type CastState = RemotePlaybackState
+type Status = { kind: 'idle' } | { kind: 'connecting' } | { kind: 'casting'; device: string } | { kind: 'error'; message: string }
 
 /**
  * Cast player (port of cast.php).
  *
- * The video plays a /shared/<token>/<file> link that needs no login, so a
- * Chromecast can fetch it itself. "Cast to TV" uses the Remote Playback API
- * (Chrome desktop and Android): Chrome shows its device picker and hands the
- * TV that URL. Files browsers can't stream download instead.
+ * The page gets a /shared/<token>/<file> link that needs no login. "Cast to
+ * TV" uses Google's Cast SDK to tell the Chromecast's built-in player to
+ * fetch and play that URL itself. Files browsers can't stream download
+ * instead.
  */
 export function Cast() {
   const [params] = useSearchParams()
@@ -21,47 +22,47 @@ export function Cast() {
   const { data, error } = useCast(path)
   const video = useRef<HTMLVideoElement>(null)
 
-  // null = unknown (desktop Chrome can't watch availability, but prompt() works)
-  const [devicesAvailable, setDevicesAvailable] = useState<boolean | null>(null)
-  const [state, setState] = useState<CastState>('disconnected')
-  const [castError, setCastError] = useState<string | null>(null)
-  const supported = typeof HTMLMediaElement !== 'undefined' && 'remote' in HTMLMediaElement.prototype
+  const [sdk, setSdk] = useState<'loading' | 'ready' | 'unavailable'>('loading')
+  const [status, setStatus] = useState<Status>({ kind: 'idle' })
+
+  useEffect(() => {
+    let cancelled = false
+    loadCastSdk().then((ok) => !cancelled && setSdk(ok ? 'ready' : 'unavailable'))
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (data && !data.streamable) window.location.replace(data.url)
   }, [data])
 
-  useEffect(() => {
-    const remote = video.current?.remote
-    if (!remote) return
-    let watchId: number | undefined
-    remote
-      .watchAvailability((available) => setDevicesAvailable(available))
-      .then((id) => (watchId = id))
-      .catch(() => setDevicesAvailable(null))
-
-    const sync = () => setState(remote.state)
-    remote.addEventListener('connecting', sync)
-    remote.addEventListener('connect', sync)
-    remote.addEventListener('disconnect', sync)
-    return () => {
-      if (watchId !== undefined) remote.cancelWatchAvailability(watchId).catch(() => {})
-      remote.removeEventListener('connecting', sync)
-      remote.removeEventListener('connect', sync)
-      remote.removeEventListener('disconnect', sync)
-    }
-  }, [data?.url])
-
   const castToTv = async () => {
-    setCastError(null)
+    if (!data) return
+    setStatus({ kind: 'connecting' })
     try {
-      await video.current?.remote.prompt()
+      const device = await castToDevice({
+        url: new URL(data.url, window.location.origin).href,
+        // The old site always said video/mp4, which the Chromecast relies on
+        contentType: data.mime.startsWith('audio/') ? data.mime : 'video/mp4',
+        title: data.name,
+        startAt: video.current?.currentTime ?? 0,
+      })
+      video.current?.pause()
+      setStatus({ kind: 'casting', device })
     } catch (e) {
-      const name = e instanceof DOMException ? e.name : ''
-      if (name === 'NotFoundError') setCastError('No Chromecast or cast-enabled TV was found on this network.')
-      else if (name === 'NotAllowedError' || name === 'AbortError') setCastError(null) // picker closed
-      else setCastError("This browser can't cast this video. In Chrome, try the ⋮ menu → Cast… instead.")
+      const reason = e instanceof Error ? e.message : String(e)
+      setStatus(
+        reason === 'cancel'
+          ? { kind: 'idle' }
+          : { kind: 'error', message: `The TV couldn't start playing (${reason}). Check it's on, then try again.` },
+      )
     }
+  }
+
+  const stop = () => {
+    stopCasting()
+    setStatus({ kind: 'idle' })
   }
 
   if (!path) {
@@ -78,17 +79,16 @@ export function Cast() {
       <PageHeader
         title={data?.name ?? 'Cast'}
         actions={
-          data?.streamable && (
-            <Button
-              size="3"
-              onClick={castToTv}
-              disabled={!supported || devicesAvailable === false}
-              loading={state === 'connecting'}
-            >
-              <CastIcon size={18} />
-              {state === 'connected' ? 'Casting — change' : 'Cast to TV'}
+          data?.streamable &&
+          (status.kind === 'casting' ? (
+            <Button size="3" color="gray" variant="soft" onClick={stop}>
+              <Square size={16} /> Stop casting
             </Button>
-          )
+          ) : (
+            <Button size="3" onClick={castToTv} disabled={sdk !== 'ready'} loading={status.kind === 'connecting' || sdk === 'loading'}>
+              <CastIcon size={18} /> Cast to TV
+            </Button>
+          ))
         }
       />
       {error && (
@@ -105,26 +105,38 @@ export function Cast() {
       {data?.streamable && (
         <>
           <video ref={video} className="screen cast-video" src={data.url} controls playsInline />
-          {castError && (
+
+          {status.kind === 'casting' && (
+            <Callout.Root mt="3" color="grass">
+              <Callout.Icon>
+                <CastIcon size={16} />
+              </Callout.Icon>
+              <Callout.Text>
+                Playing on <strong>{status.device}</strong>. Use the TV remote or the Google Home app to pause or skip; you can
+                close this tab.
+              </Callout.Text>
+            </Callout.Root>
+          )}
+          {status.kind === 'error' && (
             <Callout.Root mt="3" color="amber">
               <Callout.Icon>
                 <Info size={16} />
               </Callout.Icon>
-              <Callout.Text>{castError}</Callout.Text>
+              <Callout.Text>{status.message}</Callout.Text>
             </Callout.Root>
           )}
-          <Callout.Root mt="3" color="gray">
-            <Callout.Icon>
-              <CastIcon size={16} />
-            </Callout.Icon>
-            <Callout.Text>
-              {!supported
-                ? "This browser can't cast. Open this page in Chrome on a computer or Android phone."
-                : devicesAvailable === false
-                  ? 'No Chromecast found on this network. Check the TV is on and on the same Wi-Fi.'
-                  : 'Press Cast to TV and pick your Chromecast. The TV plays the film directly; you can close this tab once it starts. The link works for 24 hours.'}
-            </Callout.Text>
-          </Callout.Root>
+          {status.kind !== 'casting' && (
+            <Callout.Root mt="3" color="gray">
+              <Callout.Icon>
+                <CastIcon size={16} />
+              </Callout.Icon>
+              <Callout.Text>
+                {sdk === 'unavailable'
+                  ? "Casting needs Google Chrome (on a computer or Android phone). Open this page in Chrome to send it to a TV."
+                  : 'Press Cast to TV and pick your Chromecast. The TV fetches the film itself, starting from where this player is. The link works for 24 hours.'}
+              </Callout.Text>
+            </Callout.Root>
+          )}
         </>
       )}
     </>
