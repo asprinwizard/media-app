@@ -64,7 +64,11 @@ function Track({ title, track }: { title: string; track: IplayerTrack }) {
             <>
               {' · '}
               {formatBytes(track.size)}
-              {track.expectedSize ? ` / ~${formatBytes(track.expectedSize)}` : ''}
+              {track.expectedSize
+                ? ` / ~${formatBytes(track.expectedSize)}`
+                : track.status === 'downloading'
+                  ? ' / ?' // no programme info (yet): the lookup is running or failed
+                  : ''}
             </>
           )}
         </Badge>
