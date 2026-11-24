@@ -79,7 +79,7 @@ export function ExtractDialog({
                   { label: 'TV', path: 'TV' },
                 ]}
               />
-              <TextField.Root placeholder="New sub-folder (optional)" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} />
+              <TextField.Root placeholder="New sub-folder (optional), e.g. Show/Series 1 (2026)" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} />
             </Flex>
           </Flex>
         ) : (
