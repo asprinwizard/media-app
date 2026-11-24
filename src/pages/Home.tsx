@@ -4,7 +4,7 @@ import { useDashboard } from '../api/hooks'
 import { Link } from 'react-router'
 import type { Me } from '../api/types'
 import { navIcons } from '../components/navIcons'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { formatDateLong, greeting } from '../lib/format'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
@@ -18,6 +18,19 @@ const TILE_TEXT: Record<string, string> = {
   'live-tv': 'Watch live TV from the tuner box',
   logs: 'Server logs and job output',
   tools: 'Drives, media01 and recent files',
+}
+
+/** The whole log in a scrolling panel, opened at the newest entries. */
+function LogTail({ label, text }: { label: string; text: string }) {
+  const ref = useRef<HTMLPreElement>(null)
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight
+  }, [text])
+  return (
+    <pre ref={ref} className="log-tail" tabIndex={0} aria-label={label}>
+      {text || 'Nothing logged yet.'}
+    </pre>
+  )
 }
 
 export function Home({ me }: { me: Me }) {
@@ -81,13 +94,13 @@ export function Home({ me }: { me: Me }) {
               <Flex align="center" gap="2" mb="2">
                 <Clock size={16} aria-hidden />
                 <Heading as="h2" size="3">
-                  Latest {log.title} copies to media01
+                  Latest {log.title} backup to media01
                 </Heading>
               </Flex>
               <Text as="p" size="1" color="gray" mb="2">
                 {log.modified ? `Log updated ${formatDateLong(log.modified)}` : 'Log file not found'}
               </Text>
-              <pre className="log-tail">{log.lines.join('\n') || 'Nothing logged yet.'}</pre>
+              <LogTail label={`${log.title} backup log`} text={log.lines.join('\n')} />
             </Card>
           ))}
         </Grid>

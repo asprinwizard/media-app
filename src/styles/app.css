@@ -366,6 +366,13 @@ body,
   padding: 10px 14px;
   border-bottom: 1px solid var(--gray-a4);
 }
+.lib-filter {
+  width: 220px;
+  flex-shrink: 0;
+}
+.row-empty {
+  padding: 18px 14px;
+}
 
 .rows {
   list-style: none;
@@ -592,6 +599,11 @@ a.row-name:focus-visible {
   .alpha,
   .hide-sm {
     display: none;
+  }
+  .lib-filter {
+    width: auto;
+    flex: 1 1 140px;
+    max-width: 220px;
   }
   /* phones: actions on their own line under the name, names wrap */
   .row,

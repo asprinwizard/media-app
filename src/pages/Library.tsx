@@ -1,6 +1,6 @@
-import { Button, Callout, Card, Checkbox, Flex, IconButton, SegmentedControl, Skeleton, Spinner, Text, Tooltip } from '@radix-ui/themes'
+import { Button, Callout, Card, Checkbox, Flex, IconButton, SegmentedControl, Skeleton, Spinner, Text, TextField, Tooltip } from '@radix-ui/themes'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronRight, CircleCheck, CircleX, FolderOpen, ListChecks, RefreshCw, X } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronRight, CircleCheck, CircleX, FolderOpen, ListChecks, RefreshCw, Search, X } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
@@ -76,7 +76,17 @@ export function Library() {
   const servers = useServers(path, manage && isAdmin)
   const folderOnMedia01 = onMedia01 || (servers.data?.media01 ?? false)
 
-  const items = data && !isPlaceholderData ? data.items : []
+  // Text filter for the open folder; like the selection, it starts afresh in another folder.
+  const [filterState, setFilterState] = useState({ path, text: '' })
+  const filter = filterState.path === path ? filterState.text : ''
+  const setFilter = (text: string) => setFilterState({ path, text })
+  const needle = filter.trim().toLowerCase()
+  const allItems = useMemo(() => (data && !isPlaceholderData ? data.items : []), [data, isPlaceholderData])
+  const items = useMemo(
+    () => (needle ? allItems.filter((i) => i.name.toLowerCase().includes(needle)) : allItems),
+    [allItems, needle],
+  )
+  // Only what's on screen counts as selected, so hidden items are never acted on.
   const selected = items.filter((i) => selectedNames.has(i.name))
 
   // Browsing media02: media01 is only offered for items that are also there.
@@ -121,7 +131,7 @@ export function Library() {
   const selectAll = (on: boolean) => setSelection({ path, names: on ? new Set(items.map((i) => i.name)) : new Set() })
 
   const files = selected.filter((i) => i.type !== 'folder' && i.type !== 'broken')
-  const archives = items.filter((i) => i.type === 'compressed')
+  const archives = allItems.filter((i) => i.type === 'compressed')
   const media02Only = 'Only when browsing media02'
   const can: Record<ManageAction, boolean> = {
     move: selected.length > 0,
@@ -158,7 +168,22 @@ export function Library() {
   const getList = useCallback(() => listRef.current, [])
   useTypeToJump(getList, !!data)
 
-  const letters = useMemo(() => new Set(data?.items.map((i) => i.letter)), [data])
+  const letters = useMemo(() => new Set(items.map((i) => i.letter)), [items])
+  const filterRef = useRef<HTMLInputElement>(null)
+
+  // "/" jumps to the filter box, as on many sites.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) return
+      if (document.querySelector('[role="dialog"]')) return
+      event.preventDefault()
+      filterRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const setSort = (next: Partial<{ sort: SortBy; dir: SortDir }>) => {
     const merged = { sort, dir, ...next }
@@ -198,10 +223,11 @@ export function Library() {
         description={onMedia01 ? 'Browsing media01, the archive server.' : path ? undefined : 'Everything on media02, folder by folder.'}
         actions={
           <>
-            <SegmentedControl.Root value={sort} onValueChange={(value) => setSort({ sort: value as SortBy })} aria-label="Sort by">
-              <SegmentedControl.Item value="name">Name</SegmentedControl.Item>
-              <SegmentedControl.Item value="date">Date</SegmentedControl.Item>
-            </SegmentedControl.Root>
+            <Tooltip content="Refresh this folder">
+              <IconButton variant="outline" color="gray" aria-label="Refresh" onClick={refresh} disabled={isFetching}>
+                <RefreshCw size={16} className={isFetching && !loading ? 'spin' : undefined} />
+              </IconButton>
+            </Tooltip>
             {isAdmin && (
               <Button
                 variant={manage ? 'solid' : 'outline'}
@@ -216,21 +242,22 @@ export function Library() {
                 <ListChecks size={16} /> {manage ? 'Done' : 'Manage'}
               </Button>
             )}
-            <Tooltip content="Refresh this folder">
-              <IconButton variant="outline" color="gray" aria-label="Refresh" onClick={refresh} disabled={isFetching}>
-                <RefreshCw size={16} className={isFetching && !loading ? 'spin' : undefined} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip content={dir === 'asc' ? 'Ascending (click to reverse)' : 'Descending (click to reverse)'}>
-              <IconButton
-                variant="outline"
-                color="gray"
-                aria-label={dir === 'asc' ? 'Sort descending' : 'Sort ascending'}
-                onClick={() => setSort({ dir: dir === 'asc' ? 'desc' : 'asc' })}
-              >
-                {dir === 'asc' ? <ArrowUpNarrowWide size={16} /> : <ArrowDownWideNarrow size={16} />}
-              </IconButton>
-            </Tooltip>
+            <Flex gap="2" ml={{ initial: '0', sm: '4' }}>
+              <SegmentedControl.Root value={sort} onValueChange={(value) => setSort({ sort: value as SortBy })} aria-label="Sort by">
+                <SegmentedControl.Item value="name">Name</SegmentedControl.Item>
+                <SegmentedControl.Item value="date">Date</SegmentedControl.Item>
+              </SegmentedControl.Root>
+              <Tooltip content={dir === 'asc' ? 'Ascending (click to reverse)' : 'Descending (click to reverse)'}>
+                <IconButton
+                  variant="outline"
+                  color="gray"
+                  aria-label={dir === 'asc' ? 'Sort descending' : 'Sort ascending'}
+                  onClick={() => setSort({ dir: dir === 'asc' ? 'desc' : 'asc' })}
+                >
+                  {dir === 'asc' ? <ArrowUpNarrowWide size={16} /> : <ArrowDownWideNarrow size={16} />}
+                </IconButton>
+              </Tooltip>
+            </Flex>
           </>
         }
       />
@@ -327,13 +354,36 @@ export function Library() {
                 </Flex>
               ) : (
                 <Text size="1" color="gray">
-                  {data ? summary(data.items) : ''}
+                  {data ? (needle ? `${items.length} of ${allItems.length} match` : summary(data.items)) : ''}
                 </Text>
               )}
               </Flex>
-              <Text size="1" color="gray" className="hide-sm">
-                Type a letter to jump
-              </Text>
+              <TextField.Root
+                ref={filterRef}
+                size="1"
+                className="lib-filter"
+                placeholder="Filter  (press /)"
+                aria-label="Filter this folder"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setFilter('')
+                    e.currentTarget.blur()
+                  }
+                }}
+              >
+                <TextField.Slot>
+                  <Search size={14} />
+                </TextField.Slot>
+                {filter && (
+                  <TextField.Slot>
+                    <IconButton size="1" variant="ghost" color="gray" aria-label="Clear filter" onClick={() => setFilter('')}>
+                      <X size={12} />
+                    </IconButton>
+                  </TextField.Slot>
+                )}
+              </TextField.Root>
             </Flex>
 
             {isPending ? (
@@ -347,8 +397,15 @@ export function Library() {
               </ul>
             ) : (
               <ul className="rows" ref={listRef}>
-                {data?.items.map((item, index) => {
-                  const label = heading(item, data.items[index - 1], sort)
+                {needle && items.length === 0 && (
+                  <li className="row-empty">
+                    <Text size="2" color="gray">
+                      Nothing here matches “{filter.trim()}”.
+                    </Text>
+                  </li>
+                )}
+                {(isPlaceholderData ? (data?.items ?? []) : items).map((item, index, list) => {
+                  const label = heading(item, list[index - 1], sort)
                   return (
                     <Fragment key={item.path}>
                       {label && (
@@ -372,7 +429,7 @@ export function Library() {
             )}
           </Card>
 
-          {data?.alpha && !manage && (
+          {data?.alpha && (
             <nav className="alpha" aria-label="Jump to letter">
               {RAIL.map((letter) => (
                 <button
